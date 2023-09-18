@@ -19,6 +19,8 @@ def main():
     parser.add_argument("-o", "--output_dir", type=str, required=True)
     parser.add_argument("-n", "--num_process", type=int, default=os.cpu_count())
     parser.add_argument("--shard_id", type=int, default=None)
+    parser.add_argument("--ffmpeg_exec", type=str, default="/usr/bin/ffmpeg",
+                        help="path to ffmpeg executable")
     # encode opt
     parser.add_argument("--codec", type=str, default="libx264", choices=["libx264", "libx265"])
     parser.add_argument("--keyint", type=int, default=None)
@@ -36,8 +38,9 @@ def main():
     for f in os.listdir(os.path.join(args.input_dir)):
         video_files.append((os.path.join(args.input_dir, f), os.path.join(args.output_dir, f)))
 
-    runner = joblib.Parallel(n_jobs=args.num_process, return_as="generator")(
+    runner = joblib.Parallel(n_jobs=args.num_process, return_as="generator", backend="threading")(
         joblib.delayed(convert_video)(f_in, f_out,
+                                      ffmpeg_exec=args.ffmpeg_exec,
                                       codec=args.codec,
                                       keyint=args.keyint,
                                       overwrite=args.overwrite,
