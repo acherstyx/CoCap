@@ -1,0 +1,27 @@
+# Running config on 8 card V100 machine
+# ---
+# The configuration of the base model as described in our paper.
+_BASE_: "base.yaml"
+
+INFO:
+  EXPERIMENT_NAME: "msrvtt_captioning_h264"
+
+DATA:
+  DATASET:
+    NAME: "MSRVTTCaptioningDatasetForCLIP"
+  LOADER:
+    BATCH_SIZE: 2
+
+MODEL:
+  COCAP:
+    TASK_TYPE: "captioning"
+
+LOSS:
+  NAME: "LabelSmoothingLoss"
+
+TRAINER:
+  TRAINER_BASE:
+    EPOCH: 20
+    GRADIENT_ACCUMULATION_STEPS: 4
+  CAPTION_TRAINER:
+    TASK_TYPE: "captioning"

@@ -1,0 +1,86 @@
+INFO:
+  PROJECT_NAME: "compressed_video"
+
+SYS:
+  SEED: 222
+  MULTIPROCESS: True
+  DETERMINISTIC: True
+
+DATA:
+  DATASET:
+    MSRVTT:
+      VIDEO_ROOT: "./dataset/msrvtt/videos_h264_keyint_60"
+      METADATA: "./dataset/msrvtt/MSRVTT_data.json"
+      VIDEO_READER: "read_frames_compressed_domain"
+      MAX_FRAMES: 8
+      VIDEO_SIZE: (224, 224)
+      MAX_WORDS: 77
+      UNFOLD_SENTENCES: True
+    MSVD:
+      VIDEO_ROOT: "./dataset/msvd/videos_240_h264_keyint_60"
+      METADATA: "./dataset/msvd/MSVD_caption.json"
+      VIDEO_READER: "read_frames_compressed_domain"
+      MAX_FRAMES: 8
+      VIDEO_SIZE: (224, 224)
+      MAX_WORDS: 77
+      UNFOLD_SENTENCES: True
+    VATEX:
+      VIDEO_ROOT: "./dataset/vatex/videos_240_h264_keyint_60"
+      METADATA: "./dataset/vatex/VATEX_caption.json"
+      VIDEO_READER: "read_frames_compressed_domain"
+      MAX_FRAMES: 8
+      VIDEO_SIZE: (224, 224)
+      MAX_WORDS: 77
+      UNFOLD_SENTENCES: True
+  LOADER:
+    NUM_WORKERS: 12
+    PREFETCH_FACTOR: 2
+    SHUFFLE: True
+    MULTIPROCESSING_CONTEXT: "fork"
+
+CV_CONFIG:
+  NUM_GOP: 8
+  NUM_MV: 59
+  NUM_RES: 59
+  WITH_RESIDUAL: True
+  USE_PRE_EXTRACT: False
+  SAMPLE: "rand"
+
+MODEL:
+  NAME: "CoCap"
+  COCAP:
+    TASK_TYPE: "captioning"
+    PRETRAINED_CLIP: "ViT-B/16"
+    MOTION_DROPOUT_PROB: 0.2
+    RESIDUAL_DROPOUT_PROB: 0.2
+    MOTION_ENCODER:
+      PATCH_SIZE: 8
+      N_LAYERS: 2
+      N_HEADS: 8
+    RESIDUAL_ENCODER:
+      N_LAYERS: 2
+      PATCH_SIZE: 64
+      N_HEADS: 8
+    ACTION_ENCODER:
+      N_LAYERS: 1
+      N_HEADS: 8
+
+  PARALLELISM: "ddp"
+  DDP:
+    FIND_UNUSED_PARAMETERS: True
+
+OPTIMIZER:
+  NAME: "BertAdam"
+  PARAMETER:
+    lr: 1e-4
+    warmup: 0.1
+    schedule: "warmup_constant"
+    weight_decay: 0.01
+    max_grad_norm: 1.0
+
+TRAINER:
+  NAME: "CoCapTrainer"
+  CAPTION_TRAINER:
+    TASK_TYPE: null # set it in each experiment
+    CLIP_LR: 1e-6
+    LR_DECAY_GAMMA: 0.95

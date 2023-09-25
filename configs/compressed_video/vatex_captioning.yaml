@@ -1,0 +1,25 @@
+# Running config on 8 card V100 machine
+_BASE_: "base.yaml"
+
+INFO:
+  EXPERIMENT_NAME: "vatex_captioning_h264"
+
+DATA:
+  DATASET:
+    NAME: "VATEXCaptioningDatasetForCLIP"
+  LOADER:
+    BATCH_SIZE: 2
+
+MODEL:
+  COCAP:
+    TASK_TYPE: "captioning"
+
+LOSS:
+  NAME: "LabelSmoothingLoss"
+
+TRAINER:
+  TRAINER_BASE:
+    EPOCH: 20
+    GRADIENT_ACCUMULATION_STEPS: 4
+  CAPTION_TRAINER:
+    TASK_TYPE: "captioning"
