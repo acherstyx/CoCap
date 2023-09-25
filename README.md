@@ -1,6 +1,11 @@
 # Accurate and Fast Compressed Video Captioning
 
-✨This is the official implementation of ICCV 2023 paper *[Accurate and Fast Compressed Video Captioning](https://)*.
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/accurate-and-fast-compressed-video-captioning/video-captioning-on-msr-vtt-1)](https://paperswithcode.com/sota/video-captioning-on-msr-vtt-1?p=accurate-and-fast-compressed-video-captioning)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/accurate-and-fast-compressed-video-captioning/video-captioning-on-msvd-1)](https://paperswithcode.com/sota/video-captioning-on-msvd-1?p=accurate-and-fast-compressed-video-captioning)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/accurate-and-fast-compressed-video-captioning/video-captioning-on-vatex-1)](https://paperswithcode.com/sota/video-captioning-on-vatex-1?p=accurate-and-fast-compressed-video-captioning)
+
+
+✨This is the official implementation of ICCV 2023 paper *[Accurate and Fast Compressed Video Captioning](https://arxiv.org/abs/2309.12867)*.
 
 ## Introduction
 
@@ -57,5 +62,10 @@ By default, the logs and results will be saved to `./log/<experiment_name>/`. Th
 ## Citation
 
 ```text
-TBD
+@inproceedings{shen2023accurate,
+      title={Accurate and Fast Compressed Video Captioning}, 
+      author={Yaojie Shen and Xin Gu and Kai Xu and Heng Fan and Longyin Wen and Libo Zhang},
+      booktitle={Proceedings of the IEEE/CVF International Conference on Computer Vision},
+      year={2023}
+}
 ```
