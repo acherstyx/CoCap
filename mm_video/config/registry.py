@@ -15,8 +15,8 @@ __all__ = [
 ]
 
 # a list of hard-coded registry positions for config store
-DATASET_CONFIG_GROUP = "data_loader/dataset"
-MODEL_CONFIG_GROUP = "model_builder/model"
+DATASET_CONFIG_GROUP = "dataset"
+MODEL_CONFIG_GROUP = "model"
 OPTIMIZER_CONFIG_GROUP = "optimizer"
 SCHEDULER_CONFIG_GROUP = "scheduler"
 METER_CONFIG_GROUP = "meter"

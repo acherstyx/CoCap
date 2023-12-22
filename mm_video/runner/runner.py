@@ -20,10 +20,9 @@ from mm_video.utils.logging import get_timestamp
 from mm_video.utils.train_utils import manual_seed
 
 from mm_video.config import BaseConfig, register_runner_config
-from mm_video.data import DataLoaderConfig, build_loader
-from mm_video.modeling import ModelBuilderConfig, build_model
-from mm_video.trainer import BaseTrainerConfig, BaseTrainer
+from mm_video.trainer import TrainerConfig, Trainer
 from mm_video.modeling.meter import Meter, DummyMeter
+from mm_video.utils.profile import Timer
 
 import logging
 
@@ -34,12 +33,10 @@ __all__ = ["Runner", "RunnerConfig", "main"]
 
 class Runner:
     cfg: BaseConfig
-    dataloader: Dict[str, data.DataLoader]
+    dataset: Dict[str, data.Dataset]
     model: nn.Module
-    optimizer: optim.Optimizer
-    scheduler: Optional[optim.lr_scheduler.LRScheduler] = None
     meter: Meter
-    trainer: BaseTrainer = None
+    trainer: Trainer
 
     def __init__(self, cfg: BaseConfig):
         dist.init_process_group(backend="nccl")
@@ -47,28 +44,18 @@ class Runner:
         manual_seed(cfg.system)
 
         self.cfg = cfg
-        self.build_dataloader(cfg.data_loader)
-        self.build_model(cfg.model_builder)
-        self.build_optimizer(cfg.optimizer)
-        self.build_scheduler(cfg.scheduler)
+        self.build_dataset(cfg.dataset)
+        self.build_model(cfg.model)
         self.build_meter(cfg.meter)
         self.build_trainer(cfg.trainer)
 
-    def build_dataloader(self, data_loader_config: DataLoaderConfig):
-        self.dataloader = build_loader(data_loader_config)  # split: data.DataLoader
+    def build_dataset(self, dataset_config: DictConfig):
+        with Timer("Building dataset from the configuration..."):
+            self.dataset = {split: instantiate(dataset_config, split=split) for split in ("train", "test", "eval")}
 
-    def build_model(self, model_builder_config: ModelBuilderConfig):
-        self.model = build_model(model_builder_config)
-
-    def build_optimizer(self, optimizer_config: DictConfig):
-        self.optimizer: optim.Optimizer = instantiate(optimizer_config, _partial_=True)(params=self.model.parameters())
-
-    def build_scheduler(self, scheduler_config: DictConfig):
-        scheduler_callable = instantiate(scheduler_config, _partial_=True)
-        if scheduler_callable is not None:
-            self.scheduler = scheduler_callable(optimizer=self.optimizer)
-        else:
-            self.scheduler = None
+    def build_model(self, model_builder_config: DictConfig):
+        with Timer("Building model from the configuration..."):
+            self.model = instantiate(model_builder_config)
 
     def build_meter(self, meter_config: DictConfig):
         self.meter: Meter = instantiate(meter_config)
@@ -76,17 +63,15 @@ class Runner:
             logger.info("Meter is not specified.")
             self.meter = DummyMeter()
 
-    def build_trainer(self, trainer_config: BaseTrainerConfig):
-        self.trainer = instantiate(trainer_config, _partial_=True)(
-            dataloader=self.dataloader,
-            model=self.model,
-            optimizer=self.optimizer,
-            scheduler=self.scheduler,
+    def build_trainer(self, trainer_config: TrainerConfig):
+        self.trainer = instantiate(trainer_config)(
+            datasets=self.dataset, model=self.model,
             meter=self.meter
         )
 
     def run(self):
         self.trainer.train()
+        self.trainer.eval()
 
 
 @register_runner_config(name=f"{Runner.__qualname__}")
@@ -98,7 +83,5 @@ class RunnerConfig:
 @hydra.main(version_base=None, config_name="config",
             config_path=f"{os.path.dirname(os.path.abspath(__file__))}/../../configs")
 def main(cfg: BaseConfig):
-    print(f"{get_timestamp()} => Run trainer")
     runner = instantiate(cfg.runner, _partial_=True)(cfg)
     runner.run()
-    print(f"{get_timestamp()} => Finished!")

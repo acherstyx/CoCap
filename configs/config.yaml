@@ -13,7 +13,7 @@ hydra:
     version: 1
     formatters:
       mm_video:
-        format: "[%(asctime)s][Rank ${oc.env:RANK}][%(levelname)s] %(filename)s: %(lineno)3d: %(message)s"
+        format: "[%(asctime)s][Rank ${oc.env:RANK}][%(levelname)s] %(filename)s %(lineno)d: %(message)s"
     handlers:
       console:
         class: logging.StreamHandler
@@ -22,9 +22,11 @@ hydra:
       file:
         level: DEBUG
         formatter: mm_video
-        filename: "${hydra.runtime.output_dir}/${hydra.job.name}_node_${oc.env:GROUP_RANK}.log"
+        filename: "${hydra.runtime.output_dir}/${hydra.job.name}_rank_${oc.env:RANK}.log"
     loggers:
       mm_video:
         level: DEBUG
         handlers: [ file ]
         propagate: no
+    root:
+      handlers: [ ]

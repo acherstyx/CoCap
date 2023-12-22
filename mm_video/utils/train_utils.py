@@ -7,7 +7,6 @@
 import hashlib
 import os
 import pickle
-import typing
 import time
 import random
 import itertools
@@ -31,6 +30,22 @@ class SystemConfig:
     seed: int = 222
 
 
+def cuda(x: Union[torch.Tensor, Dict, List]):
+    """
+    Recursively move to GPU
+    :param x:
+    :return:
+    """
+    if isinstance(x, list) or isinstance(x, tuple):
+        return [cuda(i) for i in x]
+    elif isinstance(x, dict):
+        return {k: cuda(v) for k, v in x.items()}
+    elif isinstance(x, torch.Tensor):
+        return x.cuda(non_blocking=True)
+    else:
+        return x
+
+
 class CudaPreFetcher:
     def __init__(self, data_loader):
         self.dl = data_loader
@@ -48,15 +63,8 @@ class CudaPreFetcher:
             self.batch = self.cuda(self.batch)
 
     @staticmethod
-    def cuda(x: typing.Any):
-        if isinstance(x, list) or isinstance(x, tuple):
-            return [CudaPreFetcher.cuda(i) for i in x]
-        elif isinstance(x, dict):
-            return {k: CudaPreFetcher.cuda(v) for k, v in x.items()}
-        elif isinstance(x, torch.Tensor):
-            return x.cuda(non_blocking=True)
-        else:
-            return x
+    def cuda(x: Any):
+        return cuda(x)
 
     def __next__(self):
         torch.cuda.current_stream().wait_stream(self.stream)
@@ -158,8 +166,9 @@ def get_trainable_parameters(model: torch.nn.Module):
     Returns the number of trainable parameters and number of all parameters in the model.
     """
     trainable_params = 0
+    trainable_params_names = []
     all_param = 0
-    for _, param in model.named_parameters():
+    for param_name, param in model.named_parameters():
         num_params = param.numel()
         # if using DS Zero 3 and the weights are initialized empty
         if num_params == 0 and hasattr(param, "ds_numel"):
@@ -174,8 +183,9 @@ def get_trainable_parameters(model: torch.nn.Module):
         all_param += num_params
         if param.requires_grad:
             trainable_params += num_params
+            trainable_params_names.append(param_name)
 
-    return trainable_params, all_param
+    return trainable_params, all_param, trainable_params_names
 
 
 def compute_total_gradient_norm(model: nn.Module):
@@ -186,3 +196,11 @@ def compute_total_gradient_norm(model: nn.Module):
         total_norm += param_norm.item() ** 2
     total_norm = total_norm ** 0.5
     return total_norm
+
+
+def get_world_size() -> int:
+    """
+    Get world size from environment variable set by `torchrun`.
+
+    """
+    return int(os.environ.get("WORLD_SIZE", 1))

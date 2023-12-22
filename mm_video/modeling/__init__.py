@@ -3,8 +3,3 @@
 # @Author  : Yaojie Shen
 # @Project : MM-Video
 # @File    : __init__.py
-
-from . import common, optimizer
-
-from .model import *
-from .meter import *

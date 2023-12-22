@@ -14,8 +14,6 @@ from typing import List, Any, Optional
 # import config nodes
 from mm_video.utils.train_utils import SystemConfig
 from mm_video.utils.logging import LogConfig
-from mm_video.data.loader import DataLoaderConfig
-from mm_video.modeling.model import ModelBuilderConfig
 
 """
 Define the structure of base configuration for this template
@@ -29,18 +27,23 @@ class BaseConfig:
     defaults: List[Any] = field(
         default_factory=lambda: [
             "_self_",
-            {"trainer": "BaseTrainer"},
+            {"trainer": "Trainer"},
             {"runner": "Runner"}
         ]
     )
 
+    # Basic information configuration
     system: SystemConfig = field(default_factory=SystemConfig)
     log: LogConfig = field(default_factory=LogConfig)
-    data_loader: DataLoaderConfig = field(default_factory=DataLoaderConfig)
-    model_builder: ModelBuilderConfig = field(default_factory=ModelBuilderConfig)
+
+    # Main component configuration
+    dataset: Any = MISSING
+    model: Any = MISSING
     optimizer: Any = MISSING
     scheduler: Optional[Any] = None
     meter: Optional[Any] = None
+
+    # Pipeline configuration
     trainer: Any = MISSING
     runner: Any = MISSING
 
