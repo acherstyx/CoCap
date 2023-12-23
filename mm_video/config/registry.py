@@ -6,7 +6,7 @@
 
 from hydra.core.config_store import ConfigStore
 from omegaconf import DictConfig, ListConfig
-from typing import Union, Optional
+from typing import Union, Optional, Any
 from dataclasses import dataclass
 
 __all__ = [
@@ -24,7 +24,7 @@ TRAINER_CONFIG_GROUP = "trainer"
 RUNNER_CONFIG_GROUP = "runner"
 
 
-def __register(name: str, cls: Optional[object], group: str):
+def __register(name: str, cls: Optional[object], group: str) -> Any:
     """
     :param name: The name of the config to be registered in the config store.
     :param cls: Class name. If specified, a new data class will be built and registered with `_target_` set to this
@@ -50,29 +50,29 @@ def __register(name: str, cls: Optional[object], group: str):
     return register
 
 
-def register_dataset_config(name: str = None, cls: object = None):
+def register_dataset_config(name: str = None, cls: object = None) -> Any:
     return __register(name=name, cls=cls, group=DATASET_CONFIG_GROUP)
 
 
-def register_model_config(name: str = None, cls: object = None):
+def register_model_config(name: str = None, cls: object = None) -> Any:
     return __register(name=name, cls=cls, group=MODEL_CONFIG_GROUP)
 
 
-def register_optimizer_config(name: str = None, cls: object = None):
+def register_optimizer_config(name: str = None, cls: object = None) -> Any:
     return __register(name=name, cls=cls, group=OPTIMIZER_CONFIG_GROUP)
 
 
-def register_scheduler_config(name: str = None, cls: object = None):
+def register_scheduler_config(name: str = None, cls: object = None) -> Any:
     return __register(name=name, cls=cls, group=SCHEDULER_CONFIG_GROUP)
 
 
-def register_meter_config(name: str = None, cls: object = None):
+def register_meter_config(name: str = None, cls: object = None) -> Any:
     return __register(name=name, cls=cls, group=METER_CONFIG_GROUP)
 
 
-def register_trainer_config(name: str = None, cls: object = None):
+def register_trainer_config(name: str = None, cls: object = None) -> Any:
     return __register(name=name, cls=cls, group=TRAINER_CONFIG_GROUP)
 
 
-def register_runner_config(name: str = None, cls: object = None):
+def register_runner_config(name: str = None, cls: object = None) -> Any:
     return __register(name=name, cls=cls, group=RUNNER_CONFIG_GROUP)
