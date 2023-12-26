@@ -11,12 +11,15 @@ import time
 import random
 import itertools
 import numpy as np
+import math
 import logging
 from typing import *
 
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+from torch.distributed.fsdp import FullyShardedDataParallel
+from torch.distributed.fsdp.fully_sharded_data_parallel import _get_grad_norm
 
 from dataclasses import dataclass
 
@@ -188,14 +191,73 @@ def get_trainable_parameters(model: torch.nn.Module):
     return trainable_params, all_param, trainable_params_names
 
 
-def compute_total_gradient_norm(model: nn.Module):
-    total_norm = 0
-    parameters = [p for p in model.parameters() if p.grad is not None]
-    for p in parameters:
-        param_norm = p.grad.detach().data.norm(2)
-        total_norm += param_norm.item() ** 2
-    total_norm = total_norm ** 0.5
-    return total_norm
+def compute_total_gradient_norm(model: nn.Module, norm_type: float = 2.0) -> torch.Tensor:
+    """
+    Compute gradient norm over all parameters.
+    This needs to be called on all ranks since it uses collective communications.
+    """
+    norm_type = float(norm_type)
+    if isinstance(model, FullyShardedDataParallel):
+        # The logic for computing the total gradient norm for FSDP is adopted from the `clip_grad_norm_` method
+        # of FullyShardedDataParallel
+
+        # If every FSDP instance uses `NO_SHARD`, then we can directly use
+        # the normal `_get_grad_norm` to calculate the total gradient norm
+        all_no_shard = all(
+            not handle.uses_sharded_strategy for handle in model._all_handles
+        )
+        if all_no_shard:
+            return _get_grad_norm(model.parameters(), norm_type=norm_type)
+        sharded_params = set()
+        nonsharded_params = set()  # `NO_SHARD` or not FSDP-managed
+        grads: List[torch.Tensor] = []
+        for handle in model._all_handles:
+            target_set = (
+                sharded_params if handle.uses_sharded_strategy else nonsharded_params
+            )
+            if handle._use_orig_params:
+                for param in handle.flat_param._params:
+                    target_set.add(param)
+                    if param.grad is not None:
+                        grads.append(param.grad)
+            else:
+                target_set.add(handle.flat_param)
+                if handle.flat_param.grad is not None:
+                    grads.append(handle.flat_param.grad)
+        for param in model.parameters():
+            not_fsdp_managed = (
+                    param not in sharded_params and param not in nonsharded_params
+            )
+            if not_fsdp_managed:
+                nonsharded_params.add(param)
+                if param.grad is not None:
+                    grads.append(param.grad)
+        # Compute local norms (forced to be in FP32)
+        local_sharded_norm = _get_grad_norm(sharded_params, norm_type).to(
+            model.compute_device
+        )
+        local_nonsharded_norm = _get_grad_norm(nonsharded_params, norm_type).to(
+            model.compute_device
+        )
+        # Reconstruct the total gradient norm depending on the norm type
+        if norm_type == math.inf:
+            total_norm = torch.maximum(local_sharded_norm, local_nonsharded_norm)
+            dist.all_reduce(
+                total_norm, op=torch.distributed.ReduceOp.MAX, group=model.process_group
+            )
+        else:
+            total_norm = local_sharded_norm ** norm_type
+            dist.all_reduce(total_norm, group=model.process_group)
+            # All-reducing the local non-sharded norm would count it an extra
+            # world-size-many times
+            total_norm += local_nonsharded_norm ** norm_type
+            total_norm = total_norm ** (1.0 / norm_type)
+        if model.cpu_offload.offload_params:
+            total_norm = total_norm.cpu()
+        return total_norm.to(torch.float32)
+    else:
+        parameters = [p for p in model.parameters() if p.grad is not None]
+        return _get_grad_norm(parameters, norm_type=norm_type)
 
 
 def get_world_size() -> int:

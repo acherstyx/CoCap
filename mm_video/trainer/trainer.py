@@ -103,6 +103,7 @@ class TrainingStrategyConfig:
 
     fsdp_offload: bool = False
     fsdp_transformer_layer_cls_to_wrap: Optional[List[str]] = None
+    fsdp_use_orig_params: bool = False
 
 
 @dataclass
@@ -177,6 +178,10 @@ class Trainer:
             "If using AMP, `write_histogram_freq` cannot be enabled and must be set to `None`."
 
         torch.autograd.set_detect_anomaly(cfg.detect_anomaly)
+
+        # Initialize distribution
+        dist.init_process_group(backend="nccl")
+        torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))  # get RANK from environment
 
         self.dataset = datasets
         self.dataloader = self.build_loader(datasets, cfg=dataloader_config)
@@ -400,7 +405,8 @@ class Trainer:
                 self.model = model = FullyShardedDataParallel(
                     model,
                     cpu_offload=CPUOffload(offload_params=cfg.fsdp_offload),
-                    auto_wrap_policy=auto_wrap_policy
+                    auto_wrap_policy=auto_wrap_policy,
+                    use_orig_params=cfg.fsdp_use_orig_params
                 )
             else:
                 raise RuntimeError(f"Training strategy '{cfg.strategy}' is not supported!")
@@ -696,13 +702,12 @@ class Trainer:
         self.meter.summary(writer=self.writer, main_tag="eval", global_step=self.epoch)
         self.meter.reset()
 
-    def train(self):
+    def run(self):
         if self.cfg.do_train or self.cfg.do_test:
             self._before_train()
             self._on_train()
             self._after_train()
 
-    def eval(self):
         if self.cfg.do_eval:
             self._before_eval()
             self._on_eval()
@@ -732,6 +737,7 @@ class Trainer:
         """
         with Timer("Writing total gradient norm..."):
             total_norm = compute_total_gradient_norm(self.model)
+            logger.debug(f"Step: {self.global_step} | Total gradient norm: {total_norm}")
             self.writer.add_scalar("train/norm", total_norm, global_step=self.global_step)
 
     @torch.no_grad()

@@ -39,8 +39,6 @@ class BaseConfig:
     # Main component configuration
     dataset: Any = MISSING
     model: Any = MISSING
-    optimizer: Any = MISSING
-    scheduler: Optional[Any] = None
     meter: Optional[Any] = None
 
     # Pipeline configuration
