@@ -23,7 +23,7 @@ from torch.cuda.amp import GradScaler, autocast
 import torch.distributed as dist
 from torch.distributed.fsdp import (
     FullyShardedDataParallel,
-    CPUOffload
+    CPUOffload, ShardingStrategy
 )
 from torch.distributed.fsdp.wrap import (
     transformer_auto_wrap_policy
@@ -103,7 +103,9 @@ class TrainingStrategyConfig:
 
     fsdp_offload: bool = False
     fsdp_transformer_layer_cls_to_wrap: Optional[List[str]] = None
+    fsdp_sync_module_states: bool = False
     fsdp_use_orig_params: bool = False
+    fsdp_sharding_strategy: ShardingStrategy = ShardingStrategy.FULL_SHARD
 
 
 @dataclass
@@ -254,7 +256,7 @@ class Trainer:
 
         if state_dict is None:
             # Call the state_dict on each rank before saving on rank 0, required by FSDP model
-            model = unwrap_model(self.model)
+            model = unwrap_model(self.model_wrapped)
             state_dict = model.state_dict()
 
         if self.should_write:
@@ -369,9 +371,13 @@ class Trainer:
             logger.debug("Moving model to device: %s...", torch.cuda.current_device())
             model.cuda()
 
-        # Do not wrap model if not training
+        # Do not wrap model if not training.
         if not training:
             logger.debug("Not training, return unwrapped model.")
+            return model
+
+        # Avoid wrap model more than once.
+        if isinstance(model, (FullyShardedDataParallel, nn.DataParallel)):
             return model
 
         # wrap model
@@ -406,7 +412,9 @@ class Trainer:
                     model,
                     cpu_offload=CPUOffload(offload_params=cfg.fsdp_offload),
                     auto_wrap_policy=auto_wrap_policy,
-                    use_orig_params=cfg.fsdp_use_orig_params
+                    sync_module_states=cfg.fsdp_sync_module_states,
+                    use_orig_params=cfg.fsdp_use_orig_params,
+                    sharding_strategy=cfg.fsdp_sharding_strategy
                 )
             else:
                 raise RuntimeError(f"Training strategy '{cfg.strategy}' is not supported!")

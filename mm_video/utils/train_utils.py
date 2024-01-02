@@ -8,10 +8,9 @@ import hashlib
 import os
 import pickle
 import time
-import random
 import itertools
-import numpy as np
 import math
+from dataclasses import dataclass
 import logging
 from typing import *
 
@@ -20,8 +19,6 @@ import torch.distributed as dist
 import torch.nn as nn
 from torch.distributed.fsdp import FullyShardedDataParallel
 from torch.distributed.fsdp.fully_sharded_data_parallel import _get_grad_norm
-
-from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -85,19 +82,6 @@ class CudaPreFetcher:
         return len(self.dl)
 
 
-def manual_seed(cfg: SystemConfig):
-    if cfg.deterministic:
-        torch.manual_seed(cfg.seed)
-        random.seed(cfg.seed)
-        np.random.seed(cfg.seed)
-        torch.cuda.manual_seed(cfg.seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = True
-        logger.debug("Manual seed is set to %s", cfg.seed)
-    else:
-        logger.warning("Manual seed is not used")
-
-
 def gather_object_multiple_gpu(list_object: List[Any], backend: AnyStr = "nccl", shared_folder=None,
                                retry=600, sleep=0.1):
     """
@@ -107,6 +91,7 @@ def gather_object_multiple_gpu(list_object: List[Any], backend: AnyStr = "nccl",
     assert backend in ["nccl", "filesystem"]
     if backend == "nccl":
         gathered_objects = [None for _ in range(dist.get_world_size())]
+        logger.debug("Gathering with `all_gather_object`, please check if programme hanging...")
         dist.all_gather_object(gathered_objects, list_object)
         return list(itertools.chain(*gathered_objects))
     else:
@@ -122,7 +107,6 @@ def gather_object_multiple_gpu(list_object: List[Any], backend: AnyStr = "nccl",
             checksum = hashlib.md5(data).hexdigest()
             pickle.dump(checksum, f)
         gathered_list = []
-        dist.barrier()
         for rank in range(dist.get_world_size()):
             data_filename = os.path.join(shared_folder, f"{uuid}_rank_{rank:04d}.pkl")
             checksum_filename = os.path.join(shared_folder, f"{uuid}_rank_{rank:04d}.md5")
@@ -143,7 +127,6 @@ def gather_object_multiple_gpu(list_object: List[Any], backend: AnyStr = "nccl",
                     pass
             assert data is not None, f"Gather from filesystem failed after retry for {retry} times."
             gathered_list.extend(data)
-        dist.barrier()
         return gathered_list
 
 
@@ -266,3 +249,7 @@ def get_world_size() -> int:
 
     """
     return int(os.environ.get("WORLD_SIZE", 1))
+
+
+def get_rank() -> int:
+    return int(os.environ.get("RANK", 0))

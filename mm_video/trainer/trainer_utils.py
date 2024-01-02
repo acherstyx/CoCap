@@ -8,19 +8,24 @@ import os
 import torch
 from torch import nn
 import torch.distributed as dist
+import random
+import numpy as np
 from typing import *
 import logging
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["barrier", "get_module_class_from_name", "unwrap_model", "load_state_dict", "save_state_dict", "manual_seed"]
 
-def barrier(debug_msg: Optional[str] = None):
+
+def barrier(debug_msg: Optional[str] = None, disabled: bool = False):
     """
     A util for calling distributed barrier.
 
-    @param debug_msg: Write message to debug log
+    :param debug_msg: Write message to debug log
+    :param disabled: Disable barrier
     """
-    if dist.is_initialized():
+    if dist.is_initialized() and not disabled:
         if debug_msg is not None:
             logger.debug("Reached the '%s' barrier, waiting for other processes.", debug_msg)
         dist.barrier()
@@ -81,3 +86,13 @@ def save_state_dict(model: nn.Module, model_file: str):
     state_dict = model.state_dict()
     os.makedirs(os.path.basename(model_file), exist_ok=True)
     torch.save(state_dict, model_file)
+
+
+def manual_seed(seed):
+    torch.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True
+    logger.debug("Manual seed is set to %s", seed)
