@@ -12,7 +12,7 @@ from tqdm import tqdm
 import logging
 
 from hydra.utils import get_object
-from dataclasses import field, dataclass
+from dataclasses import dataclass
 from enum import Enum
 from typing import *
 
@@ -33,7 +33,7 @@ from collections import defaultdict
 import contextlib
 from functools import partial
 
-from mm_video.config.registry import register_trainer_config
+from mm_video.config import trainer_store
 from mm_video.modeling.meter import Meter
 from mm_video.modeling.optimization import get_linear_schedule_with_warmup
 from mm_video.utils.train_utils import (
@@ -44,7 +44,7 @@ from mm_video.utils.profile import Timer
 from .trainer_utils import barrier, get_module_class_from_name, load_state_dict, unwrap_model
 
 __all__ = [
-    "Trainer", "TrainerConfig",
+    "Trainer",
     "TrainingStrategy", "TrainingStrategyConfig", "DataLoaderConfig", "TrainingConfig"
 ]
 
@@ -150,24 +150,14 @@ class TrainingConfig:
     gradient_accumulation_steps: int = 1
 
 
-@register_trainer_config(name=f"Trainer")
-@dataclass
-class TrainerConfig:
-    _target_: str = f"{__name__}.Trainer"
-    _partial_: bool = True
-
-    training_config: TrainingConfig = field(default_factory=TrainingConfig)
-    dataloader_config: DataLoaderConfig = field(default_factory=DataLoaderConfig)
-    training_strategy_config: TrainingStrategyConfig = field(default_factory=TrainingStrategyConfig)
-
-
+@trainer_store(zen_partial=True)  # Set `zen_partial=True` if you inherit from this trainer
 class Trainer:
     def __init__(
             self,
-            dataloader_config: DataLoaderConfig,
-            training_strategy_config: TrainingStrategyConfig,
-            training_config: TrainingConfig,
             datasets: Dict[str, data.Dataset], model: nn.Module, meter: Meter,
+            training_config: TrainingConfig = TrainingConfig(),
+            dataloader_config: DataLoaderConfig = DataLoaderConfig(),
+            training_strategy_config: TrainingStrategyConfig = TrainingStrategyConfig(),
             optimizer: Optional[optim.Optimizer] = None,
             scheduler: Optional[optim.lr_scheduler.LRScheduler] = None
     ):
@@ -182,7 +172,8 @@ class Trainer:
         torch.autograd.set_detect_anomaly(cfg.detect_anomaly)
 
         # Initialize distribution
-        dist.init_process_group(backend="nccl")
+        if not dist.is_initialized():
+            dist.init_process_group(backend="nccl")
         torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))  # get RANK from environment
 
         self.dataset = datasets

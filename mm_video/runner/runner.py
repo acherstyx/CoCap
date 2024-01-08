@@ -8,7 +8,6 @@ import hydra
 from hydra.utils import instantiate
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
-from dataclasses import dataclass
 from typing import *
 
 import os
@@ -18,7 +17,7 @@ from torch.utils.data import Dataset
 
 import mm_video
 from mm_video.trainer.trainer_utils import manual_seed
-from mm_video.config import BaseConfig, register_runner_config
+from mm_video.config import BaseConfig, runner_store
 from mm_video.modeling.meter import Meter, DummyMeter
 from mm_video.utils.profile import Timer
 
@@ -26,9 +25,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["Runner", "RunnerConfig", "main"]
+__all__ = ["Runner", "main"]
 
 
+@runner_store
 class Runner:
     """
     Runner is a basic entry point for building datasets and models, and running the training, testing, and evaluation
@@ -79,12 +79,6 @@ class Runner:
         )
 
         trainer.run()
-
-
-@register_runner_config(name=f"{Runner.__qualname__}")
-@dataclass
-class RunnerConfig:
-    _target_: str = f"{__name__}.{Runner.__qualname__}"
 
 
 @hydra.main(version_base=None, config_name="config",
